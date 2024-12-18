@@ -1,0 +1,492 @@
+CREATE SCHEMA IF NOT EXISTS ods;
+CREATE SCHEMA IF NOT EXISTS stg;
+
+
+DROP TABLE IF EXISTS ods.airports_raw_team10;
+CREATE TABLE ods.airports_raw_team10 (
+    id                text,
+    ident             text,
+    type              text,
+    name              text,
+    latitude_deg      text,
+    longitude_deg     text,
+    elevation_ft      text,
+    continent         text,
+    iso_country       text,
+    iso_region        text,
+    municipality      text,
+    scheduled_service text,
+    gps_code          text,
+    iata_code         text,
+    local_code        text,
+    home_link         text,
+    wikipedia_link    text,
+    keywords          text,
+    load_dttm         timestamp default now()
+);
+
+
+DROP TABLE IF EXISTS stg.airports_team10;
+CREATE TABLE stg.airports_team10 (
+    iata_code          varchar(10),
+    icao_code          varchar(10),
+    airport_name       varchar(255),
+    ident              varchar(50),
+    type               varchar(50),
+    latitude_deg       numeric(10,6),
+    longitude_deg      numeric(10,6),
+    elevation_ft       int,
+    continent          varchar(10),
+    iso_country        varchar(10),
+    iso_region         varchar(20),
+    municipality       varchar(255),
+    scheduled_service  varchar(10),
+    local_code         varchar(10),
+    home_link          text,
+    wikipedia_link     text,
+    keywords           text,
+    processed_dttm     timestamp default now()
+);
+
+INSERT INTO stg.airports_team10 (
+    iata_code,
+    icao_code,
+    airport_name,
+    ident,
+    type,
+    latitude_deg,
+    longitude_deg,
+    elevation_ft,
+    continent,
+    iso_country,
+    iso_region,
+    municipality,
+    scheduled_service,
+    local_code,
+    home_link,
+    wikipedia_link,
+    keywords
+)
+SELECT
+    iata_code::varchar(10),
+    gps_code::varchar(10) AS icao_code,
+    name::varchar(255) AS airport_name,
+    ident::varchar(50),
+    type::varchar(50),
+    nullif(latitude_deg, '')::numeric(10,6),
+    nullif(longitude_deg, '')::numeric(10,6),
+    nullif(elevation_ft, '')::int,
+    continent::varchar(10),
+    iso_country::varchar(10),
+    iso_region::varchar(20),
+    municipality::varchar(255),
+    scheduled_service::varchar(10),
+    local_code::varchar(10),
+    home_link::text,
+    wikipedia_link::text,
+    keywords::text
+FROM ods.airports_raw_team10;
+
+
+
+
+DROP TABLE IF EXISTS ods.weather_raw_team10;
+CREATE TABLE ods.weather_raw_team10 (
+    local_time_in_king_salmon_airport text,
+    t text,
+    p0 text,
+    p text,
+    u text,
+    dd text,
+    ff text,
+    ff10 text,
+    ww text,
+    w_w_ text,
+    c text,
+    vv text,
+    td text,
+    load_dttm timestamp default now()
+);
+
+
+DROP TABLE IF EXISTS stg.weather_team10;
+CREATE TABLE stg.weather_team10 (
+  icao_code varchar(10) NOT NULL,
+  local_datetime timestamp,
+  t_air_temperature numeric(3,1),
+  p0_sea_lvl numeric(4,1),
+  p_station_lvl numeric(4,1),
+  u_humidity int4,
+  dd_wind_direction varchar(300) NULL,
+  ff_wind_speed int4 NULL,
+  ff10_max_gust_value int4 NULL,
+  ww_present varchar(100) NULL,
+  ww_recent varchar(50) NULL,
+  c_total_clouds varchar(400),
+  vv_horizontal_visibility numeric(3,1),
+  td_temperature_dewpoint numeric(3,1),
+  processed_dttm timestamp NOT NULL DEFAULT now(),
+  PRIMARY KEY (icao_code, local_datetime)
+);
+
+
+INSERT INTO stg.weather_team10 (
+    icao_code,
+    local_datetime,
+    t_air_temperature,
+    p0_sea_lvl,
+    p_station_lvl,
+    u_humidity,
+    dd_wind_direction,
+    ff_wind_speed,
+    ff10_max_gust_value,
+    ww_present,
+    ww_recent,
+    c_total_clouds,
+    vv_horizontal_visibility,
+    td_temperature_dewpoint
+)
+SELECT
+    'PAKN' AS icao_code,
+    local_time_in_king_salmon_airport::timestamp AS local_datetime,
+    nullif(t, '')::numeric(3,1) AS t_air_temperature,
+    nullif(p0, '')::numeric(4,1) AS p0_sea_lvl,
+    nullif(p, '')::numeric(4,1) AS p_station_lvl,
+    nullif(u, '')::int AS u_humidity,
+    dd::varchar(300) AS dd_wind_direction,
+    nullif(ff, '')::int AS ff_wind_speed,
+    nullif(ff10, '')::int AS ff10_max_gust_value,
+    ww::varchar(100) AS ww_present,
+    w_w_::varchar(50) AS ww_recent,
+    c::varchar(400) AS c_total_clouds,
+    nullif(vv, '')::numeric(3,1) AS vv_horizontal_visibility,
+    nullif(td, '')::numeric(3,1) AS td_temperature_dewpoint
+FROM ods.weather_raw_team10;
+
+
+
+
+DROP TABLE IF EXISTS ods.flights_raw_team10;
+CREATE TABLE ods.flights_raw_team10 (
+    year              text,
+    quarter           text,
+    month             text,
+    fl_date           text,
+    op_unique_carrier text,
+    op_carrier        text,
+    tail_num          text,
+    op_carrier_fl_num text,
+    origin            text,
+    dest              text,
+    crs_dep_time      text,
+    dep_time          text,
+    dep_delay_new     text,
+    cancelled         text,
+    cancellation_code text,
+    air_time          text,
+    distance          text,
+    weather_delay     text,
+    load_dttm         timestamp default now()
+);
+
+
+DROP TABLE IF EXISTS stg.flights_team10;
+CREATE TABLE stg.flights_team10 (
+    year                int not null,
+    quarter             int,
+    month               int not null,
+    flight_date         date not null,
+    op_unique_carrier   varchar(10),
+    op_carrier          varchar(10),
+    tail_num            varchar(10),
+    op_carrier_fl_num   varchar(10),
+    origin              varchar(10),
+    dest                varchar(10),
+    crs_dep_time        int,
+    dep_time            int,
+    dep_delay_minutes   float,
+    cancelled           int,
+    cancellation_code   char(1),
+    air_time            float,
+    distance            float,
+    weather_delay       float,
+    processed_dttm      timestamp default now()
+);
+
+INSERT INTO stg.flights_team10 (
+    year,
+    quarter,
+    month,
+    flight_date,
+    op_unique_carrier,
+    op_carrier,
+    tail_num,
+    op_carrier_fl_num,
+    origin,
+    dest,
+    crs_dep_time,
+    dep_time,
+    dep_delay_minutes,
+    cancelled,
+    cancellation_code,
+    air_time,
+    distance,
+    weather_delay
+)
+SELECT
+    nullif(year, '')::int as year,
+    nullif(quarter, '')::int as quarter,
+    nullif(month, '')::int as month,
+    to_timestamp(nullif(fl_date, ''), 'MM/DD/YYYY HH12:MI:SS AM')::date as flight_date,
+    op_unique_carrier::varchar(10) as op_unique_carrier,
+    op_carrier::varchar(10) as op_carrier,
+    tail_num::varchar(10) as tail_num,
+    op_carrier_fl_num::varchar(10) as op_carrier_fl_num,
+    origin::varchar(10) as origin,
+    dest::varchar(10) as dest,
+    nullif(crs_dep_time, '')::int as crs_dep_time,
+    nullif(dep_time, '')::int as dep_time,
+    nullif(dep_delay_new, '')::float as dep_delay_minutes,
+    CASE 
+        WHEN nullif(cancelled, '')::float > 0 THEN 1
+        ELSE 0
+    END as cancelled,
+    cancellation_code::char(1) as cancellation_code,
+    nullif(air_time, '')::float as air_time,
+    nullif(distance, '')::float as distance,
+    nullif(weather_delay, '')::float as weather_delay
+FROM ods.flights_raw_team10;
+
+CREATE TABLE IF NOT EXISTS dds.airport_team10 (
+    airportid    serial primary key,
+    icao_code    varchar(10) not null unique,
+    iata_code    varchar(10) not null unique,
+    airport_name varchar(255),
+    processed_dttm timestamp default now()
+);
+
+CREATE TABLE IF NOT EXISTS dds.airport_weather_team10 (
+    weatherid      serial primary key,
+    airportid      int not null references dds.airport_team10(airportid),
+    rain           boolean,
+    snow           boolean,
+    thunderstorm   boolean,
+    fog_mist       boolean,
+    drizzle        boolean,
+    w_speed        numeric(5,2),
+    max_gws        numeric(5,2),
+    t              numeric(5,2),
+    cold           boolean,
+    start_date     timestamp not null,
+    end_date       timestamp not null default '3000-01-01'::timestamp,
+    weather_type_dk varchar(50),
+    processed_dttm timestamp default now()
+);
+
+CREATE TABLE IF NOT EXISTS dds.flights_team10 (
+    flightid          serial primary key,
+    year              int not null,
+    quarter           int,
+    month             int not null,
+    flight_date       date not null,
+    dep_time          int4,
+    crs_dep_time      int4,
+    dep_delay_minutes float,
+    cancelled         int not null,
+    cancellation_code char(1),
+    weather_delay     float,
+    reporting_airline varchar(10),
+    tail_number       varchar(10),
+    flight_number     varchar(15) not null,
+    distance          float,
+    airport_origin_dk int,
+    airport_dest_dk   int,
+    processed_dttm    timestamp default(now())
+);
+
+INSERT INTO dds.airport_team10 (icao_code, iata_code, airport_name)
+WITH filtered_icao AS (
+    SELECT DISTINCT ON (icao_code)
+        s.icao_code,
+        s.iata_code,
+        s.airport_name
+    FROM stg.airports_team10 s
+    WHERE COALESCE(s.icao_code, '') <> ''
+      AND COALESCE(s.iata_code, '') <> ''
+    ORDER BY s.icao_code, s.iata_code
+),
+filtered_iata AS (
+    SELECT DISTINCT ON (iata_code)
+        f.icao_code,
+        f.iata_code,
+        f.airport_name
+    FROM filtered_icao f
+    ORDER BY f.iata_code, f.icao_code
+)
+SELECT
+    fi.icao_code,
+    fi.iata_code,
+    fi.airport_name
+FROM filtered_iata fi
+WHERE NOT EXISTS (
+    SELECT 1 FROM dds.airport_team10 d
+    WHERE d.icao_code = fi.icao_code 
+       OR d.iata_code = fi.iata_code
+);
+
+
+WITH source_data AS (
+    SELECT
+        (SELECT airportid FROM dds.airport_team10 WHERE icao_code = 'PAKN') AS airportid,
+        local_datetime AS start_date,
+        ff_wind_speed::numeric(5,2) AS w_speed,
+        ff10_max_gust_value::numeric(5,2) AS max_gws,
+        t_air_temperature::numeric(5,2) AS t,
+        (t_air_temperature < 0) AS cold,
+        (ww_present ILIKE '%rain%' OR ww_recent ILIKE '%rain%') AS rain,
+        (ww_present ILIKE '%snow%' OR ww_recent ILIKE '%snow%') AS snow,
+        (ww_present ILIKE '%thunderstorm%' OR ww_recent ILIKE '%thunderstorm%') AS thunderstorm,
+        ((ww_present ILIKE '%fog%' OR ww_present ILIKE '%mist%' 
+          OR ww_recent ILIKE '%fog%' OR ww_recent ILIKE '%mist%')) AS fog_mist,
+        (ww_present ILIKE '%drizzle%' OR ww_recent ILIKE '%drizzle%') AS drizzle
+    FROM stg.weather_team10
+    WHERE icao_code = 'PAKN'
+    ORDER BY local_datetime
+),
+changes AS (
+    SELECT
+        airportid,
+        start_date,
+        rain, snow, thunderstorm, fog_mist, drizzle,
+        w_speed, max_gws, t, cold,
+        CASE 
+          WHEN LAG(rain) OVER (ORDER BY start_date) IS DISTINCT FROM rain
+            OR LAG(snow) OVER (ORDER BY start_date) IS DISTINCT FROM snow
+            OR LAG(thunderstorm) OVER (ORDER BY start_date) IS DISTINCT FROM thunderstorm
+            OR LAG(fog_mist) OVER (ORDER BY start_date) IS DISTINCT FROM fog_mist
+            OR LAG(drizzle) OVER (ORDER BY start_date) IS DISTINCT FROM drizzle
+            OR LAG(w_speed) OVER (ORDER BY start_date) IS DISTINCT FROM w_speed
+            OR LAG(max_gws) OVER (ORDER BY start_date) IS DISTINCT FROM max_gws
+            OR LAG(t) OVER (ORDER BY start_date) IS DISTINCT FROM t
+            OR LAG(cold) OVER (ORDER BY start_date) IS DISTINCT FROM cold
+            OR LAG(airportid) OVER (ORDER BY start_date) IS NULL
+          THEN 1 ELSE 0 
+        END AS is_new_state
+    FROM source_data
+),
+final_data AS (
+    SELECT
+        airportid,
+        start_date,
+        rain, snow, thunderstorm, fog_mist, drizzle,
+        w_speed, max_gws, t, cold, is_new_state,
+        LEAD(start_date, 1, '3000-01-01'::timestamp) OVER (ORDER BY start_date) AS next_start_date
+    FROM changes
+)
+INSERT INTO dds.airport_weather_team10 (
+    airportid, rain, snow, thunderstorm, fog_mist, drizzle,
+    w_speed, max_gws, t, cold, start_date, end_date, weather_type_dk
+)
+SELECT 
+    airportid,
+    rain,
+    snow,
+    thunderstorm,
+    fog_mist,
+    drizzle,
+    w_speed,
+    max_gws,
+    t,
+    cold,
+    start_date,
+    next_start_date,
+    TRIM(CONCAT(
+        CASE WHEN cold THEN 'cold' ELSE '' END,
+        CASE WHEN rain THEN 'rain' ELSE '' END,
+        CASE WHEN snow THEN 'snow' ELSE '' END,
+        CASE WHEN thunderstorm THEN 'thunderstorm' ELSE '' END,
+        CASE WHEN drizzle THEN 'drizzle' ELSE '' END,
+        CASE WHEN fog_mist THEN 'fog_mist' ELSE '' END
+    )) AS weather_type_dk
+FROM final_data
+WHERE is_new_state = 1;
+
+
+INSERT INTO dds.flights_team10 (
+    year,
+    quarter,
+    month,
+    flight_date,
+    dep_time,
+    crs_dep_time,
+    dep_delay_minutes,
+    cancelled,
+    cancellation_code,
+    weather_delay,
+    reporting_airline,
+    tail_number,
+    flight_number,
+    distance,
+    airport_origin_dk,
+    airport_dest_dk
+)
+SELECT
+    f.year,
+    f.quarter,
+    f.month,
+    f.flight_date,
+    f.dep_time,
+    f.crs_dep_time,
+    f.dep_delay_minutes,
+    f.cancelled,
+    f.cancellation_code::char(1),
+    f.weather_delay,
+    f.op_unique_carrier AS reporting_airline,
+    f.tail_num AS tail_number,
+    f.op_carrier_fl_num AS flight_number,
+    f.distance,
+    (SELECT airportid FROM dds.airport_team10 WHERE iata_code = f.origin LIMIT 1) AS airport_origin_dk,
+    (SELECT airportid FROM dds.airport_team10 WHERE iata_code = f.dest LIMIT 1) AS airport_dest_dk
+FROM stg.flights_team10 f
+WHERE NOT EXISTS (
+    SELECT 1 
+    FROM dds.flights_team10 d
+    WHERE d.flight_date = f.flight_date
+      AND d.flight_number = f.op_carrier_fl_num
+      AND d.airport_origin_dk = (SELECT airportid FROM dds.airport_team10 WHERE iata_code = f.origin LIMIT 1)
+      AND d.airport_dest_dk = (SELECT airportid FROM dds.airport_team10 WHERE iata_code = f.dest LIMIT 1)
+      AND d.crs_dep_time = f.crs_dep_time
+);
+
+CREATE SCHEMA IF NOT EXISTS mart;
+
+DROP TABLE IF EXISTS mart.fact_departure;
+CREATE TABLE mart.fact_departure (
+    flight_date DATE NOT NULL,
+    flight_number VARCHAR(10) NOT NULL,
+    airport_origin_dk INT NOT NULL,
+    weather_type_dk VARCHAR(50),
+    dep_delay_minutes FLOAT,
+    cancelled INT,
+    loaded_ts TIMESTAMP DEFAULT now()
+);
+
+INSERT INTO mart.fact_departure (
+    flight_date,
+    flight_number,
+    airport_origin_dk,
+    weather_type_dk,
+    dep_delay_minutes,
+    cancelled
+)
+SELECT
+    f.flight_date,
+    f.flight_number,
+    f.airport_origin_dk,
+    w.weather_type_dk,
+    f.dep_delay_minutes,
+    f.cancelled
+FROM dds.flights_team10 f
+LEFT JOIN dds.airport_weather_team10 w
+  ON f.airport_origin_dk = w.airportid
+ AND f.flight_date BETWEEN w.start_date AND w.end_date;
